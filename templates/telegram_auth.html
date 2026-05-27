@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Авторизация в Telegram</h2>
+
+{% if qr_image_base64 %}
+    <p>Сканируйте QR-код в приложении Telegram:</p>
+    <img src="data:image/png;base64,{{ qr_image_base64 }}" alt="Telegram QR Code" />
+{% endif %}
+
+{% if needs_2fa %}
+    <p>На вашем аккаунте включена двухфакторная аутентификация. Введите пароль Telegram:</p>
+    <form method="post">
+        {% csrf_token %}
+        <input type="password" name="password" placeholder="Пароль 2FA" required>
+        <button type="submit">Отправить</button>
+    </form>
+{% else %}
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit">Готово</button>
+    </form>
+{% endif %}
+{% endblock %}

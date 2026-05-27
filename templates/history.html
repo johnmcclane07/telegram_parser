@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}История запросов - Телеграм Парсер{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>История запросов</h2>
+
+    <form method="GET" action="{% url 'history' %}" class="search-form mb-4">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Введите ваш запрос" value="{{ search_query }}">
+            <button class="btn btn-primary" type="submit">Поиск</button>
+        </div>
+    </form>
+
+    {% if posts %}
+        <ul class="history-list">
+            {% for post in posts %}
+            <li class="history-item d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                    <a href="{% url 'post_detail' post.id %}" class="history-link">{{ post.channel }}/{{ post.post_id }}</a>
+                    <br>
+                    {% if post.date %}
+                        <small class="text-muted">Дата поста: {{ post.date|date:"Y-m-d H:i" }}</small><br>
+                    {% endif %}
+                    <small class="text-muted">Создано в системе: {{ post.created_at|date:"Y-m-d H:i" }}</small>
+                </div>
+                <div class="mt-2 mt-md-0">
+                    <form action="{% url 'post_delete' post.id %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="mt-3">История запросов отсутствует.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.history-list {
+    list-style: none;
+    padding: 0;
+}
+
+.history-item {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    transition: box-shadow 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.history-item:hover {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.history-link {
+    font-weight: bold;
+    color: #0078D7;
+    text-decoration: none;
+    font-size: 18px;
+}
+
+.history-link:hover {
+    text-decoration: underline;
+}
+
+.delete-button {
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.btn-outline-danger {
+    border: 1px solid #ff4d4d;
+    color: #ff4d4d;
+}
+
+.btn-outline-danger:hover {
+    background-color: #ff4d4d;
+    color: #fff;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Вход - Телеграм Парсер{% endblock %}
+
+{% block content %}
+    <div style="max-width: 400px; margin: 0 auto;">
+        <h2 style="text-align: center; color: #4a90e2; margin-bottom: 30px;">🔑 Вход в систему</h2>
+        
+        <form method="post" style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
+            {% csrf_token %}
+            
+            <div style="margin-bottom: 20px;">
+                <label for="id_username" style="display: block; margin-bottom: 8px; font-weight: bold; color: #555;">
+                    Имя пользователя
+                </label>
+                <input type="text" 
+                       name="username" 
+                       id="id_username" 
+                       required 
+                       style="width: 100%; 
+                              padding: 12px; 
+                              border: 2px solid #ddd; 
+                              border-radius: 5px; 
+                              font-size: 16px;"
+                       placeholder="Введите имя пользователя">
+                {% if form.username.errors %}
+                    <div style="color: #dc3545; font-size: 14px; margin-top: 5px;">
+                        {% for error in form.username.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div style="margin-bottom: 25px;">
+                <label for="id_password" style="display: block; margin-bottom: 8px; font-weight: bold; color: #555;">
+                    Пароль
+                </label>
+                <input type="password" 
+                       name="password" 
+                       id="id_password" 
+                       required 
+                       style="width: 100%; 
+                              padding: 12px; 
+                              border: 2px solid #ddd; 
+                              border-radius: 5px; 
+                              font-size: 16px;"
+                       placeholder="Введите пароль">
+                {% if form.password.errors %}
+                    <div style="color: #dc3545; font-size: 14px; margin-top: 5px;">
+                        {% for error in form.password.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <button type="submit" 
+                    style="width: 100%; 
+                           background-color: #4a90e2; 
+                           color: white; 
+                           border: none; 
+                           padding: 15px; 
+                           border-radius: 5px; 
+                           font-size: 16px; 
+                           font-weight: bold; 
+                           cursor: pointer;">
+                Войти
+            </button>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="{% url 'register' %}" style="color: #4a90e2; text-decoration: none;">
+                    Нет аккаунта? Зарегистрироваться
+                </a>
+            </div>
+        </form>
+        
+        <div style="text-align: center; margin-top: 20px; color: #666; font-size: 14px;">
+            <p>Демо доступ:</p>
+            <p>👤 <strong>admin</strong> / 🔑 <strong>admin123</strong></p>
+        </div>
+    </div>
+{% endblock %}

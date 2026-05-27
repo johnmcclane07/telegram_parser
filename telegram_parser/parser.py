@@ -1,13 +1,12 @@
 import logging
 import time
 from urllib.parse import urlparse
-import asyncio
-from telethon import TelegramClient
+from telethon import TelegramClient, errors
 from transformers import pipeline
 from qrcode import QRCode
 import getpass
-from telethon import errors
 from decouple import config
+from .models import TelegramPost, TelegramComment
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,15 +21,22 @@ API_HASH = config("API_HASH")
 sentiment_pipeline = pipeline(
     model="seara/rubert-tiny2-russian-sentiment",
 )
-
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 
 # ================== Utils ==================
 
 def parse_telegram_post_url(url: str):
+
     parsed = urlparse(url)
     parts = parsed.path.strip("/").split("/")
-    return parts[0], int(parts[1])
+
+    if not parts or len(parts) < 2:
+        raise ValueError("Неверная ссылка Telegram")
+
+    chat_id = parts[0]  # username
+    post_id = int(parts[1])
+
+    return chat_id, post_id
 
 # ================== Sentiment ==================
 
@@ -51,88 +57,132 @@ def analyze_batch(comments):
     results = []
 
     for comment, result in zip(comments, outputs):
-        label = result["label"].lower()
+        sentiment = result["label"].lower()
+
+        sender = comment.sender
+
+        username = getattr(sender, "username", None)
+        phone = getattr(sender, "phone", None)
+        name = getattr(sender, "first_name", None)
 
         results.append({
+            "sender_username": username or "Unknown",
+            "sender_phone": phone or "Unknown",
+            "sender_name": name or "Unknown",
             "comment_id": comment.id,
             "text": comment.text,
             "date": comment.date,
-            "sentiment": label,
-            "label": label,
-            "score": float(result["score"]),
+            "sentiment": sentiment,
         })
-
     return results
 
 # ================== QR Utils ==================
 
 qr = QRCode()
 
-def gen_qr(token: str):
+def display_qr(url: str):
     qr.clear()
-    qr.add_data(token)
+    qr.add_data(url)
     qr.print_ascii()
-
-def display_url_as_qr(url: str):
-    print("Сканируй QR-код в Telegram:")
-    gen_qr(url)
+    print("Сканируй QR-код в Telegram")
 
 # ================== Telegram Client ==================
 
-async def get_client_qr():
-    client = TelegramClient("qr_session", API_ID, API_HASH)
+async def get_client():
+
+    client = TelegramClient('session', API_ID, API_HASH)
+
     await client.connect()
 
     if await client.is_user_authorized():
         return client
 
-    qr_login = await client.qr_login()
-    logged_in = False
-
-    while not logged_in:
-        display_url_as_qr(qr_login.url)
+    qr = await client.qr_login()
+    while True:
+        display_qr(qr.url)  
         try:
-            logged_in = await qr_login.wait(timeout=10)
+            await qr.wait()
+            break
         except errors.SessionPasswordNeededError:
-            password = getpass.getpass("Введите пароль двухфакторной аутентификации Telegram: ")
+            password = getpass.getpass("2FA: ")
             await client.sign_in(password=password)
-            logged_in = True
-        except Exception:
-            qr_login = await qr_login.recreate()
-
-    me = await client.get_me()
-    print("Вы вошли как:", me.username)
+            break
+        except Exception as e:
+            print(f"Ошибка: {e}, пересоздаю QR")
+            qr = await qr.recreate()
 
     return client
 
-
 # ================== Main ==================
 
-async def fetch_comments(channel_id, post_id):
-    async with await get_client_qr() as client:
+async def fetch_comments(channel_id, post_id, request):
+    """
+    Скачивает комментарии к посту и сохраняет их в базу.
+    Создание поста в базе происходит только после успешного парсинга комментариев.
+    """
+
+    async with await get_client() as client:
         logger.info(f"[START] Fetching comments {channel_id}/{post_id}")
 
         buffer = []
         all_results = []
 
-        async for message in client.iter_messages(
-            entity=channel_id,
-            reply_to=post_id,
-            reverse=True,
-        ):
-            if not message.text:
-                continue
+        # Получаем entity канала
+        entity = await client.get_entity(channel_id)
 
-            buffer.append(message)
+        try:
+            async for message in client.iter_messages(
+                entity=entity,
+                reply_to=post_id,
+                reverse=True,
+            ):
+                if not message.text:
+                    continue
 
-            if len(buffer) >= BATCH_SIZE:
+                buffer.append(message)
+
+                if len(buffer) >= BATCH_SIZE:
+                    batch_results = analyze_batch(buffer)
+                    all_results.extend(batch_results)
+                    buffer.clear()
+
+            if buffer:
                 batch_results = analyze_batch(buffer)
                 all_results.extend(batch_results)
-                buffer.clear()
 
-        if buffer:
-            batch_results = analyze_batch(buffer)
-            all_results.extend(batch_results)
+        except Exception as e:
+            logger.error(f"Error while fetching messages: {e}")
+            return [] 
 
-        logger.info("[END] Done")
-        return all_results
+        logger.info(f"[END] Done. Fetched {len(all_results)} comments")
+
+        post, created = await TelegramPost.objects.aget_or_create(
+            channel=channel_id,
+            post_id=post_id
+        )
+
+        await post.parsed_by.aadd(request.user)
+        await post.asave()
+
+        comments_to_create = [
+            TelegramComment(
+                post=post,
+                comment_id=result["comment_id"],
+                username=result["sender_username"],
+                phone=result["sender_phone"],
+                name=result["sender_name"],
+                text=result["text"],
+                date=result["date"],
+                sentiment=result["sentiment"],
+            )
+            for result in all_results
+        ]
+
+        await TelegramComment.objects.abulk_create(
+            comments_to_create,
+            update_conflicts=True,
+            unique_fields=['post', 'comment_id'],
+            update_fields=['username', 'phone', 'name', 'text', 'date', 'sentiment']
+        )
+
+    return all_results

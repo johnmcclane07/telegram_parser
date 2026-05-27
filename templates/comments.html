@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Комментарии{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Комментарии к посту</h2>
+
+    <form method="get" action="{% url 'post-comments' %}" style="margin-bottom:20px; display:flex; gap:10px;">
+        <input type="text" name="url" placeholder="Введите ссылку на Telegram пост" 
+               value="{{ url|default:'' }}" style="flex:1; padding:8px; border-radius:5px; border:1px solid #ccc;">
+        <button type="submit" class="auth-button">Получить комментарии</button>
+    </form>
+
+    {% if error %}
+        <div style="color:red; padding:10px; border:1px solid red; border-radius:5px;">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if page_obj %}
+        <div id="comments">
+            {% for comment in page_obj %}
+                <div class="comment mb-3 p-3 border rounded">
+                    <strong>{{ comment.username|default:"Неизвестно" }}:</strong>
+                    <p class="mb-1">{{ comment.date }}</p>
+                    <small class="d-block mb-1">{{ comment.text }}</small>
+                    <p class="mb-0">
+                        Тональность:
+                        {% if comment.sentiment == 'positive' %}
+                            <span class="sentiment positive">Позитивный</span>
+                        {% elif comment.sentiment == 'negative' %}
+                            <span class="sentiment negative">Негативный</span>
+                        {% elif comment.sentiment == 'neutral' %}
+                            <span class="sentiment neutral">Нейтральный</span>
+                        {% else %}
+                            <span class="sentiment unknown">Неизвестно</span>
+                        {% endif %}
+                    </p>
+                </div>
+            {% endfor %}
+        </div>
+
+        <nav aria-label="Page navigation">
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?url={{ url }}&page={{ page_obj.previous_page_number }}">« Назад</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">« Назад</span></li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="?url={{ url }}&page={{ num }}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?url={{ url }}&page={{ page_obj.next_page_number }}">Вперед »</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">Вперед »</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% elif url %}
+        <p>Комментариев не найдено.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.comment {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.sentiment.positive { color: green; }
+.sentiment.negative { color: red; }
+.sentiment.neutral  { color: gray; }
+.sentiment.unknown  { color: orange; }
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 20px;
+}
+
+.pagination .page-item {
+    list-style: none;
+}
+
+.pagination .page-link {
+    display: inline-block;
+    padding: 6px 12px;
+    border: 1px solid #0078D7;
+    border-radius: 5px;
+    color: #0078D7;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.pagination .page-link:hover {
+    background-color: #0078D7;
+    color: #fff;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #0078D7;
+    color: #fff;
+    border-color: #0078D7;
+}
+
+.pagination .page-item.disabled .page-link {
+    color: #ccc;
+    border-color: #ccc;
+    pointer-events: none;
+}
+</style>
+{% endblock %}
