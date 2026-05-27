@@ -11,9 +11,9 @@
 
 ## Технический стек
 
-Бэкенд: Django/Django REST Framework
+Бэкенд: Django
 
-Парсинг Telegram: через Telethon или клиентскую библиотеку
+Парсинг Telegram: Telethon 
 
 Sentiment анализ: Hugging Face Transformers, модель rubert-tiny2-russian-sentiment
 
